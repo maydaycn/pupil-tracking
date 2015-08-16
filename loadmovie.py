@@ -1,37 +1,38 @@
-import subprocess as sp
-import itertools
 import numpy as np
+import cv2
+import matplotlib.pyplot as plt
 
-FFMPEG_BIN = "ffmpeg" # on Linux ans Mac OS
+cap = cv2.VideoCapture('BehaviorData_video.avi')
 
+aperture = 5
+thres = 50
 
-def load_movie(file, frames=None):
-    command = [ FFMPEG_BIN,
-                '-i', file,
-                '-f', 'image2pipe',
-                '-pix_fmt', 'rgb24',
-                '-vcodec', 'rawvideo', '-']
-    pipe_in = sp.Popen(command, stdout = sp.PIPE, bufsize=10**8)
+windowClose = np.ones((5, 5), np.uint8)
+windowOpen = np.ones((2, 2), np.uint8)
+windowErode = np.ones((2, 2), np.uint8)
 
-    if frames is None:
-        frames = itertools.count(start=0, step=1)
+while (cap.isOpened()):
+    ret, frame = cap.read()
 
-    frameidx = -1
-    for i in frames:
-        while frameidx != i:
-            raw_image = pipe_in.stdout.read(1280*720*3)
-            frameidx += 1
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # cv2.equalizeHist(gray, gray)
+    # _, im_bw = cv2.threshold(gray, thres, 255, cv2.THRESH_BINARY )
+    im_bw = gray
+    # cv2.medianBlur(im_bw, aperture, im_bw)
+    dev = cv2.Sobel(im_bw, cv2.CV_32F, 0, 2)
+    sobelx = cv2.Sobel(gray,cv2.CV_64F,1,0,ksize=5)
+    sobely = cv2.Sobel(gray,cv2.CV_64F,0,1,ksize=5)
+    #----------------------------------
+    # TODO: Remove this later
+    from IPython import embed
+    embed()
+    exit()
+    #----------------------------------
 
+    cv2.imshow('frame', im_bw)
 
-for i in range(N):
-    print('Frame %i' % (i,))
-    # read 1280x720*3 bytes (= 1 frame)
-    # transform the byte read into a numpy array
-    if not raw_image:
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-    image =  numpy.fromstring(raw_image, dtype='uint8')
 
-    I = image.reshape((720,1280,3))
-    # throw away the data in the pipe's buffer.
-    pipe_in.stdout.flush()
-    pipe.stdin.write( process_img(noiselevel).tostring() )
+cap.release()
+cv2.destroyAllWindows()
