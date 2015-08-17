@@ -57,17 +57,15 @@ I, J = np.meshgrid(
     np.arange(640),
     np.arange(480))
 
-
+window_half = 100
 while (cap.isOpened()):
     ret, frame = cap.read()
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     cv2.equalizeHist(gray, gray)
     _, im_bw = cv2.threshold(gray, thres, 255, cv2.THRESH_BINARY_INV )
-    # _, im_bw = cv2.threshold(gray, thres, 255, cv2.THRESH_TRUNC )
 
     # cv2.medianBlur(im_bw, 3, im_bw)
-    # im_bw = gray
 
     S = frst(im_bw, np.arange(5, 30, 2), alpha=2.8, std_factor=.8, beta=80)
     p = np.percentile(S.ravel(), 99.9)
@@ -76,7 +74,19 @@ while (cap.isOpened()):
     S = S/S.sum()
     x = int((I*S).sum())
     y = int((J*S).sum())
+
+    gray_glint = gray[y-window_half:y+window_half, x-window_half:x+window_half].copy()
+    _, im_glint = cv2.threshold(gray_glint, 240, 255, cv2.THRESH_BINARY )
+    im_glint = cv2.erode(im_glint,kernel,iterations = 2)
+    i, j = np.meshgrid( np.arange(x-window_half, x+window_half),
+                        np.arange(y-window_half, y+window_half))
+    im_glint =  im_glint.astype(float) / im_glint.sum()
+    x_glint = int((i*im_glint).sum())
+    y_glint = int((j*im_glint).sum())
+
     cv2.circle(gray, (x,y), 5, (255,0,0), thickness=2, lineType=8, shift=0)
+    cv2.circle(gray, (x_glint,y_glint), 5, (127,127,127), thickness=2, lineType=8, shift=0)
+
     cv2.imshow('frame', gray)
     # cv2.imshow('frame', 255-im_bw)
 
