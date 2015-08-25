@@ -49,7 +49,7 @@ def frst(img, radii, alpha=2., std_factor=0.25, k_n = 9.9, orientation_based=Fal
     return S[max_radius:-max_radius, max_radius:-max_radius]
 
 
-cap = cv2.VideoCapture('demo.avi')
+cap = cv2.VideoCapture('BehaviorData_video.avi')
 
 thres = 10
 kernel = np.ones((5,5))
@@ -58,11 +58,14 @@ I, J = np.meshgrid(
     np.arange(480))
 
 window_half = 100
+frame_no = -1
 while (cap.isOpened()):
+    frame_no += 1
     ret, frame = cap.read()
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     cv2.equalizeHist(gray, gray)
+    print 'Frame', frame_no
     _, im_bw = cv2.threshold(gray, thres, 255, cv2.THRESH_BINARY_INV )
 
     # cv2.medianBlur(im_bw, 3, im_bw)
@@ -71,21 +74,22 @@ while (cap.isOpened()):
     p = np.percentile(S.ravel(), 99.9)
     S[S<p] = 0
     S = cv2.erode(S,kernel,iterations = 1)
-    S = S/S.sum()
-    x = int((I*S).sum())
-    y = int((J*S).sum())
+    if np.any(S > 0):
+        S = S/S.sum()
+        x = int((I*S).sum())
+        y = int((J*S).sum())
+        gray_glint = gray[y-window_half:y+window_half, x-window_half:x+window_half].copy()
+        _, im_glint = cv2.threshold(gray_glint, 220, 255, cv2.THRESH_BINARY )
+        if im_glint is not None:
+            im_glint = cv2.erode(im_glint,kernel,iterations = 2)
+            i, j = np.meshgrid( np.arange(x-window_half, x+window_half),
+                                np.arange(y-window_half, y+window_half))
 
-    gray_glint = gray[y-window_half:y+window_half, x-window_half:x+window_half].copy()
-    _, im_glint = cv2.threshold(gray_glint, 240, 255, cv2.THRESH_BINARY )
-    im_glint = cv2.erode(im_glint,kernel,iterations = 2)
-    i, j = np.meshgrid( np.arange(x-window_half, x+window_half),
-                        np.arange(y-window_half, y+window_half))
-    im_glint =  im_glint.astype(float) / im_glint.sum()
-    x_glint = int((i*im_glint).sum())
-    y_glint = int((j*im_glint).sum())
-
-    cv2.circle(gray, (x,y), 5, (255,0,0), thickness=2, lineType=8, shift=0)
-    cv2.circle(gray, (x_glint,y_glint), 5, (127,127,127), thickness=2, lineType=8, shift=0)
+            im_glint =  im_glint.astype(float) / im_glint.sum()
+            x_glint = int((i*im_glint).sum())
+            y_glint = int((j*im_glint).sum())
+            cv2.circle(gray, (x,y), 5, (255,0,0), thickness=2, lineType=8, shift=0)
+            cv2.circle(gray, (x_glint,y_glint), 5, (127,127,127), thickness=2, lineType=8, shift=0)
 
     cv2.imshow('frame', gray)
     # cv2.imshow('frame', 255-im_bw)
