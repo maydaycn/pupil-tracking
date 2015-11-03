@@ -43,7 +43,7 @@ y = []
 q = args.downsample_factor
 patch_size = args.patch_size
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots() #jugnu what is this for
 
 cap = cv2.VideoCapture(args.videofile)
 i = 0
@@ -66,14 +66,14 @@ while (cap.isOpened()) and positives < args.positives:
     ax.imshow(gray, cmap=plt.cm.gray)
     if x is not None:
         psh = patch_size / 2
-        x = x[::-1]
+        x = x[::-1] #jugnu what is this doing?
         ax.fill_between([x[1] - psh, x[1] + psh], [x[0] - psh, x[0] - psh], [x[0] + psh, x[0] + psh],
-                        color='lime', alpha=.1)
+                        color='lime', alpha=.1) #jugnu this is to display green box on the position of x
 
     ax.set_title('Click on the center of the eye! Middle mouse button for skip. %i/%i' % (positives, args.positives))
     plt.draw()
 
-    x = plt.ginput(1)
+    x = plt.ginput(1) #jugnu to take the input from mouse 1 time
     if len(x) == 0:
         print "No input found."
     else:
@@ -89,7 +89,7 @@ while (cap.isOpened()) and positives < args.positives:
             y.append(1.)
             positives += 1
 
-    X.extend(sample_random_patches(gray, patch_size, args.negative_factor))
+    X.extend(sample_random_patches(gray, patch_size, args.negative_factor)) #jugnu how is negative factor used?
     y.extend(args.negative_factor * [-1.])
 
     plt.draw()

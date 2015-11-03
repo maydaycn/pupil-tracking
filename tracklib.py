@@ -10,15 +10,15 @@ class PatchSelector:
     def __init__(self, svmfile, datafile):
         self.svm = joblib.load(svmfile)
         with h5py.File(datafile, 'r') as fid:
-            self.q = fid.attrs['downsample_factor']
+            self.q = fid.attrs['downsample_factor'] #jugnu, when is this called and how this works
             self.patch_size = fid.attrs['patch_size']
 
     def __call__(self, img):
         q = self.q
         patch_size = self.patch_size
-        img_pos = self.get_pos(img)
+        img_pos = self.get_pos(img) 
         retval = None
-        fps = self.full_patch_size
+        fps = self.full_patch_size #jugnu actual number of pixels without downsampling
         if img_pos is not None:
             start_i, start_j = img_pos
             retval = img[start_i:start_i + fps, start_j:start_j + fps]
@@ -28,10 +28,10 @@ class PatchSelector:
     def get_pos(self, img):
         q = self.q
         gray_small = img[::q, ::q]
-        X, pos = extract_patches(gray_small, self.patch_size)
-        y = self.svm.decision_function(X)
+        X, pos = extract_patches(gray_small, self.patch_size) #jugnu we get a column vector with elements as different box/ patch
+        y = self.svm.decision_function(X) #jugnu will this work if svm is untrained? what values y can take?
         if np.any(y > 0):
-            return pos[np.argmax(y), :]*q
+            return pos[np.argmax(y), :]*q #jugnu is argmax taken to get the lowest  and most right image??
         else:
             return None
 
@@ -41,11 +41,11 @@ class PatchSelector:
 
 def extract_patches(img, patch_size, normalize=True):
     X = []
-    pos = list(itertools.product(range(img.shape[0] - patch_size), range(img.shape[0] - patch_size)))
+    pos = list(itertools.product(range(img.shape[0] - patch_size), range(img.shape[0] - patch_size))) #jugnu img.shape[1] for y cordinate??
     for i, j in pos:
-        X.append(img[i:i + patch_size, j:j + patch_size].ravel())
+        X.append(img[i:i + patch_size, j:j + patch_size].ravel()) #jugnu ravel is for turning matrix in a vector
 
-    return np.vstack(X) / (255. if normalize else 1.), np.vstack(pos)
+    return np.vstack(X) / (255. if normalize else 1.), np.vstack(pos) #jugnu vstack turns a row into a column
 
 
 def frst(img, radii, alpha=2., std_factor=0.25, k_n=9.9, orientation_based=False, beta=2):
@@ -108,7 +108,7 @@ def extract_patch(x, img, patch_size):
 
     x_sl, y_sl = slice(start[0], start[0] + patch_size), slice(start[1], start[1] + patch_size)
 
-    if x_sl.start < 0 or x_sl.stop >= img.shape[1] or y_sl.start < 0 or y_sl.stop >= img.shape[0]:
+    if x_sl.start < 0 or x_sl.stop >= img.shape[1] or y_sl.start < 0 or y_sl.stop >= img.shape[0]: #jugnu is 0 and 1 not interchanged?
         warnings.warn("Cannot extract patch. Returning None.")
         return None
     else:
