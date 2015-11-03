@@ -32,6 +32,7 @@ args = parser.parse_args()
 
 assert args.svm_file is not None or args.svm_data is None, 'If --svm-file is set, you must set --svm-data as well.'
 
+
 if args.svm_file is not None:
     patch_selector = PatchSelector(args.svm_file, args.svm_data)
 else:
@@ -39,6 +40,8 @@ else:
 
 X = []
 y = []
+
+
 
 q = args.downsample_factor
 patch_size = args.patch_size
@@ -49,6 +52,7 @@ cap = cv2.VideoCapture(args.videofile)
 i = 0
 positives = 0
 x = None
+
 while (cap.isOpened()) and positives < args.positives:
     ret, frame = cap.read()
     i += 1
@@ -57,7 +61,7 @@ while (cap.isOpened()) and positives < args.positives:
     else:
         i = 0
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    gray = patch_selector(gray)
+    gray = patch_selector(gray) # TODO this doesn't make any sense at all
     if gray is None:
         continue
     else:
@@ -66,9 +70,8 @@ while (cap.isOpened()) and positives < args.positives:
     ax.imshow(gray, cmap=plt.cm.gray)
     if x is not None:
         psh = patch_size / 2
-        x = x[::-1] #jugnu what is this doing?
-        ax.fill_between([x[1] - psh, x[1] + psh], [x[0] - psh, x[0] - psh], [x[0] + psh, x[0] + psh],
-                        color='lime', alpha=.1) #jugnu this is to display green box on the position of x
+        ax.fill_between([x[0] - psh, x[0] + psh], [x[1] - psh, x[1] - psh], [x[1] + psh, x[1] + psh],
+                        color='lime', alpha=.1)
 
     ax.set_title('Click on the center of the eye! Middle mouse button for skip. %i/%i' % (positives, args.positives))
     plt.draw()

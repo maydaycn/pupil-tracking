@@ -7,23 +7,23 @@ from sklearn.externals import joblib
 
 
 class PatchSelector:
-    def __init__(self, svmfile, datafile):
+    def __init__(self, svmfile, datafile, thin=1):
         self.svm = joblib.load(svmfile)
         with h5py.File(datafile, 'r') as fid:
             self.q = fid.attrs['downsample_factor'] #jugnu, when is this called and how this works
             self.patch_size = fid.attrs['patch_size']
+        self.thin = thin
 
     def __call__(self, img):
-        q = self.q
-        patch_size = self.patch_size
-        img_pos = self.get_pos(img) 
+        # q = self.q
+        # patch_size = self.patch_size
+        img_pos = self.get_pos(img)
         retval = None
         fps = self.full_patch_size #jugnu actual number of pixels without downsampling
         if img_pos is not None:
             start_i, start_j = img_pos
             retval = img[start_i:start_i + fps, start_j:start_j + fps]
         return retval
-
 
     def get_pos(self, img):
         q = self.q
@@ -37,11 +37,12 @@ class PatchSelector:
 
     @property
     def full_patch_size(self):
-        return self.patch_size*self.q
+        return self.patch_size * self.q
 
-def extract_patches(img, patch_size, normalize=True):
+
+def extract_patches(img, patch_size, normalize=True, thin=1):
     X = []
-    pos = list(itertools.product(range(img.shape[0] - patch_size), range(img.shape[0] - patch_size))) #jugnu img.shape[1] for y cordinate??
+    pos = list(itertools.product(range(img.shape[0] - patch_size), range(img.shape[1] - patch_size))) #jugnu img.shape[1] for y cordinate??
     for i, j in pos:
         X.append(img[i:i + patch_size, j:j + patch_size].ravel()) #jugnu ravel is for turning matrix in a vector
 
@@ -96,7 +97,7 @@ def frst(img, radii, alpha=2., std_factor=0.25, k_n=9.9, orientation_based=False
 
 def sample_random_patches(img, patch_size, n):
     ret = []
-    for n in range(n):
+    for n in range(n): # TODO: possibly exclude the eye
         i = np.random.randint(patch_size // 2 + 1, img.shape[1] - patch_size // 2 - 1)
         j = np.random.randint(patch_size // 2 + 1, img.shape[0] - patch_size // 2 - 1)
         ret.append(extract_patch((i, j), img, patch_size))

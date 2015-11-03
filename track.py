@@ -23,11 +23,12 @@ parser.add_argument('videofile', metavar='videofile', type=str,
                     help='Video of the mouse eye.')
 parser.add_argument('-t', '--threshold', type=int, default=10, help='threshold for binarizing pupil image (in percent)')
 parser.add_argument('-k', '--erosion-kernel-size', type=int, default=5, help='size of the erosion kernel')
+parser.add_argument('-s', '--stride', type=int, default=1, help='stride for rastering the image')
 args = parser.parse_args()
 # ----------------------------------
 
 eye_selector = PatchSelector(args.eye_svm, args.eyefile)
-pupil_selector = PatchSelector(args.pupil_svm, args.pupilfile)
+pupil_selector = PatchSelector(args.pupil_svm, args.pupilfile, args.stride)
 
 
 kernel = np.ones((args.erosion_kernel_size,args.erosion_kernel_size), dtype=np.uint8)
@@ -43,14 +44,16 @@ i = 0
 while cap.isOpened():
     ret, frame = cap.read()
     i += 1
-    if i < 200:
+    if i < 500: # TODO: 2 B removed
         continue
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     eye_pos = eye_selector.get_pos(gray)
 
     if eye_pos is not None:
-        pupil_pos = pupil_selector.get_pos(eye_selector(gray))
+        pupil_pos = pupil_selector.get_pos(eye_selector(gray)) # this is the patch selection with SVMs
         if pupil_pos is not None:
+
+            # ------------ START HERE
             pupil_pos = eye_pos+pupil_pos
             cv2.rectangle(gray, tuple(pupil_pos[::-1]), tuple( pupil_pos[::-1]+pupil_selector.full_patch_size), (255,0,0), 3)
 
@@ -63,11 +66,13 @@ while cap.isOpened():
             cv2.medianBlur(im_bw, 3, im_bw)
 
             im_bw = cv2.dilate(im_bw,kernel,iterations = 1)
-            moments = cv2.moments(im_bw)
+            moments = cv2.moments(im_bw) # moment
             try:
                 cog = np.array([moments['m10']/moments['m00'], moments['m01']/moments['m00']], dtype=int)
             except:
                 continue
+
+            # ------------ END HERE
 
 
             cv2.circle(gray, tuple(pupil_pos[::-1] + cog), 5, (255,0,0), thickness=2, lineType=8, shift=0)

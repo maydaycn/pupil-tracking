@@ -43,7 +43,7 @@ args = parser.parse_args()
 
 with h5py.File(args.datafile, 'r') as fid:
     X_train = np.asarray(fid['X'], dtype=float)
-    X_train /= 255
+    X_train /= 255 # extract_patch does not normalize
     y_train = np.asarray(fid['y'], dtype=float)
 
 gamma = 1 / np.median(pdist(X_train, 'euclidean'))
@@ -54,7 +54,7 @@ tuned_parameters = [{'kernel': ['rbf'], 'gamma': list(2 ** np.arange(-3, 4.) * g
                      'class_weight': [{1: int((y_train == -1).sum() / (y_train == 1).sum())}]},
                     ]
 
-clf = GridSearchCV(SVC(C=1), tuned_parameters, cv=5, scoring='accuracy', n_jobs=10, verbose=True)
+clf = GridSearchCV(SVC(), tuned_parameters, cv=5, scoring='accuracy', n_jobs=10, verbose=True)
 clf.fit(X_train, y_train)
 
 best = clf.best_estimator_
