@@ -19,7 +19,7 @@ parser.add_argument('outfile', metavar='outfile', type=str,
 parser.add_argument('-q', '--downsample-factor', type=int, default=10, help='downsample factor (default 10)')
 parser.add_argument('-P', '--patch-size', type=int, default=30, help='patch size (default 30)')
 
-parser.add_argument('-p', '--positives', type=int, default=200,
+parser.add_argument('-p', '--positives', type=int, default=50,
                     help='numper of positive examples to collect (default 200)')
 parser.add_argument('-n', '--negative-factor', type=int, default=5,
                     help='factor of negatives per positive example (default 5)')
@@ -105,4 +105,5 @@ with h5py.File(args.outfile, 'w') as fid:
     fid.create_dataset('y', y.shape, data=y, compression='gzip')
 
     for key in [k for k in dir(args) if not k.startswith('_')]:
-        fid.attrs[key] = getattr(args, key)
+        if getattr(args, key) is not None:
+            fid.attrs[key] = getattr(args, key)
