@@ -44,7 +44,7 @@ i = 0
 while cap.isOpened():
     ret, frame = cap.read()
     i += 1
-    if i < 500: # TODO: 2 B removed
+    if i < args.stride: # TODO: 2 B removed
         continue
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     eye_pos = eye_selector.get_pos(gray)
@@ -54,6 +54,7 @@ while cap.isOpened():
         if pupil_pos is not None:
 
             # ------------ START HERE
+            '''
             pupil_pos = eye_pos+pupil_pos
             cv2.rectangle(gray, tuple(pupil_pos[::-1]), tuple( pupil_pos[::-1]+pupil_selector.full_patch_size), (255,0,0), 3)
 
@@ -71,11 +72,38 @@ while cap.isOpened():
                 cog = np.array([moments['m10']/moments['m00'], moments['m01']/moments['m00']], dtype=int)
             except:
                 continue
-
+            '''
             # ------------ END HERE
 
+            #START HERE JUGNU
+            pupil_pos = eye_pos+pupil_pos
+            cv2.rectangle(gray, tuple(pupil_pos[::-1]), tuple( pupil_pos[::-1]+pupil_selector.full_patch_size), (255,0,0), 3)
 
-            cv2.circle(gray, tuple(pupil_pos[::-1] + cog), 5, (255,0,0), thickness=2, lineType=8, shift=0)
+            small_gray = gray[pupil_pos[0]:pupil_pos[0]+pupil_selector.full_patch_size,
+                                pupil_pos[1]:pupil_pos[1]+pupil_selector.full_patch_size]
+
+            cv2.medianBlur(small_gray, 7, small_gray)
+            im_bw = cv2.adaptiveThreshold(small_gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
+            cv2.medianBlur(im_bw, 7, im_bw)
+            im_bw = cv2.erode(im_bw,kernel,iterations = 1)
+            cv2.medianBlur(im_bw, 3, im_bw)
+            im_bw = cv2.dilate(im_bw,kernel,iterations = 1)
+
+            im_bw_inv = 255-im_bw
+            moments = cv2.moments(im_bw_inv) # moment
+            try:
+                cog = np.array([moments['m10']/moments['m00'], moments['m01']/moments['m00']], dtype=int)
+            except:
+                print("Error occured in try")
+
+
+
+
+
+            #END HERE JUGNU
+
+
+            cv2.circle(gray, tuple(pupil_pos[::-1] + cog), 25, (255,0,0), thickness=2, lineType=8, shift=0)
         cv2.rectangle(gray, tuple(eye_pos[::-1]), tuple( eye_pos[::-1]+eye_selector.full_patch_size), (255,0,0), 3)
 
 
