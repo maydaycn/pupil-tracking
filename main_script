@@ -1,0 +1,157 @@
+#!/bin/bash
+# use predefined variables to access passed arguments
+
+#echo arguments to the shell
+#echo 'printing commandline arguments: ' $1 $2 $3 ' -> echo $1 $2 $3'
+
+
+
+
+echo -e "Tasks to perform: Options=(1.initialize, 2.generate_training_data, 3.train_SVM, 4.track_pupil) : "
+echo -e "Enter the task to perform \c "
+read task 
+
+if [ "$task" = "init" ]; then
+	echo "Initializing"
+	echo -e "Enter the video_folder name present in /media/scratch01/WholeCell/jake/ as 151121"
+	read video_folder
+	if [ -d "/media/scratch01/WholeCell/jake/$video_folder" ]; then
+		videos=/media/scratch01/WholeCell/jake/$video_folder/*.avi
+		#echo "Length = " ${#videos[@]}
+		echo "Found the video_folder in the same area and creating same folders in current directory here..."
+		videos=/media/scratch01/WholeCell/jake/$video_folder/*.avi
+		count=0;
+		for f in $videos
+		do
+			#echo $f
+			IFS='/' read -r -a vid <<< "$f"
+			IFS='.' read -r -a nam <<< "${vid[-1]}"
+			name=${nam[0]}
+			echo 'Creating folder for' $name
+			mkdir -p $video_folder/$name/images
+			count=$(($count+1))
+		done
+		mkdir -p $video_folder/training_data
+		echo "Created folder for $count video files"
+	else
+		echo "ERROR: Not foound /media/scratch01/WholeCell/jake/$video_folder"
+	fi
+	
+elif [ $task = "generate_training_data" ]; then
+	echo "Generating training data"
+	echo -e "Enter the video_folder name present in /media/scratch01/WholeCell/jake/ as 151121"
+	read video_folder
+	echo "Enter the videofile name for which training data has to be generated as m6457A1eyetracking.avi : \c"
+	read video
+	IFS='.' read -r -a nam <<< "$video"
+	name=${nam[0]}
+	echo "Generating data in folder $video_folder/$name"
+	if [ -d "$video_folder/$name" ]; then
+		python ../pupil_tracking2/generate_training_data.py /media/scratch01/WholeCell/jake/$video_folder/$video $video_folder/$name/out -q 30 -P 10 -s 0 -p 40
+	else
+		echo "Please initialize before generating training data"
+	fi
+
+
+
+
+elif [ $task = "train_SVM" ]; then
+	echo "training SVM"
+	
+	echo -e "Enter the video_folder name present in /media/scratch01/WholeCell/jake/ as 151121"
+	read video_folder
+
+	echo "Which training you want to perform? Options:(local/global_to_video/global)"
+	read train
+	if [ $train = "global_to_video" ]; then
+		echo "Mode? Options: (single/append/multiple)"
+		read mode
+		if [ $mode = "single" ]; then
+			if [ -f $video_folder/training_data/svm_root ]; then
+				echo "Warning: Before Training, the global SVM is composed of following video data. All earlier data will be erased."
+				cat $video_folder/training_data/svm_root
+			fi
+			echo -e "Enter the videofile name for which training has to be performed to create SVM, as m6457A1eyetracking.avi or exit the program: \c"
+			read video
+			IFS='.' read -r -a nam <<< "$video"
+			name=${nam[0]}
+			if [ -f "$video_folder/$name/out" ]; then
+				python ../pupil_tracking2/train_SVM.py $video_folder/$name/out $video_folder/training_data/g_svm
+				echo "$name" > $video_folder/training_data/svm_root
+			else
+				echo "ERROR: Please generate training data before training SVM"
+				exit
+			fi
+		elif [ $mode = "append" ]; then
+			echo "Before Training, the global SVM is composed of following video data"
+			cat $video_folder/training_data/svm_root
+			read -r initial <<< `cat $video_folder/training_data/svm_root`
+			echo "Enter new video name to include as m6457A1eyetracking.avi"
+			read video
+			IFS='.' read -r -a nam <<< "$video"
+			name=${nam[0]}
+			if [ -f $video_folder/$nam/out ]; then
+				read -r final <<< `echo $initial $name`
+				python ../pupil_tracking2/train_SVM_append.py -v $video_folder -l "$final" 
+				echo "$final" > $video_folder/training_data/svm_root
+				echo "After Training the global SVM is composed of following video data"
+				cat $video_folder/training_data/svm_root
+			else
+				echo "ERROR: Could not find generated data $video_folder/$nam/out. Please do generate data before training SVM"
+				exit
+			fi
+		elif [ $mode = "multiple" ]; then
+			if [ -f $video_folder/training_data/svm_root ]; then
+				echo "Warning: Before Training, the global SVM is composed of following video data. All earlier data will be erased."
+				cat $video_folder/training_data/svm_root
+			fi
+			echo -e "Enter list of videofilenames for which SVM has to be created without .avi extension like \"m6457B2eyetracking m6457B3eyetracking\""
+			IFS= read -r video_l
+			echo "Checking if all input present or not for $video_l"
+			for x in $video_l
+			do
+			if [ -f $video_folder/$x/out ]; then
+				echo "Found generated data $video_folder/$x/out"
+			else
+				echo "ERROR: Not able to find generated data $video_folder/$x/out. Please do generate data before training SVM"
+				exit
+			fi
+			done
+			python ../pupil_tracking2/train_SVM_append.py -v $video_folder -l "$video_l"
+			echo "$video_l" > $video_folder/training_data/svm_root
+			echo "After Training the global SVM is composed of following video data"
+			cat $video_folder/training_data/svm_root
+		fi
+	elif [ $train = "global" ]; then
+		echo "DOing global training"	
+	fi
+
+elif [ $task = "track_pupil" ]; then
+	echo "tracking pupil"
+	echo "Enter mode of running as one video or entire folder (video/group)"
+	read -r mode
+	if [ $mode = "group" ]; then
+		echo -e "Enter the video_folder name present in /media/scratch01/WholeCell/jake/ as 151121 \c"
+		read -r video_folder
+		videos=`ls $video_folder | grep m`
+		echo  -e "Enter the svm file to use as svm_version2 \c"
+		read -r svm_v	
+		echo  -e "Enter the number of jobs to run parallely \c"
+		read -r njobs	
+		echo "Will run tracking for the videos: "${videos[*]}" with $njobs jobs in parallel"
+		echo "" > $video_folder/run_script
+		for word in ${videos[*]}; do 
+			echo "cd $video_folder/$word; python ../../../pupil_tracking2/track.py ../../151204/m7237A3eyetracking/out ../../$svm_v/svm /media/scratch01/WholeCell/jake/$video_folder/$word.avi; cd ../.." >> $video_folder/run_script
+		done
+		echo "Summary of Run Command is as follow:"
+		cat $video_folder/run_script
+		echo -e "Press (y/n) to confirm and launch the jobs \c"
+		read -r inp
+		if [ $inp = "y" ]; then
+			cat $video_folder/run_script | parallel -j $njobs --nice 5
+		fi
+	fi
+fi
+
+echo " "
+echo " "
