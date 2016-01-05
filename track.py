@@ -1,6 +1,6 @@
 from __future__ import print_function
 import argparse
-
+import math
 import h5py
 import numpy as np
 import cv2
@@ -15,159 +15,150 @@ parser.add_argument('eyefile', metavar='eyefile', type=str,
                     help='File containing the training data for the eye.')
 parser.add_argument('eye_svm', metavar='eye_svm', type=str,
                     help='File with the trained eye SVM.')
-parser.add_argument('pupilfile', metavar='pupilfile', type=str,
-                    help='File containing the training data for the pupil.')
-parser.add_argument('pupil_svm', metavar='pupil_svm', type=str,
-                    help='File with the trained pupil SVM.')
 parser.add_argument('videofile', metavar='videofile', type=str,
                     help='Video of the mouse eye.')
 parser.add_argument('-t', '--threshold', type=int, default=20, help='threshold for binarizing pupil image (in percent)')
 parser.add_argument('-k', '--erosion-kernel-size', type=int, default=5, help='size of the erosion kernel')
 parser.add_argument('-s', '--stride', type=int, default=1, help='stride for rastering the image')
+parser.add_argument('-T', '--start', type=int, default=1, help='starting frame')
 args = parser.parse_args()
 # ----------------------------------
 
 eye_selector = PatchSelector(args.eye_svm, args.eyefile)
-pupil_selector = PatchSelector(args.pupil_svm, args.pupilfile, args.stride)
 
-
-kernel = np.ones((args.erosion_kernel_size,args.erosion_kernel_size), dtype=np.uint8)
-
-r = int(np.floor(args.erosion_kernel_size/2))
-i,j = np.meshgrid(np.arange(-r,r+1), np.arange(-r,r+1))
-n = np.sqrt(i**2 + j**2)
-kernel[n > r] = 0
-print(kernel)
-#pipe_maxr = [0,0,0,0,0]
-#pipe_maxc = [[0,0],[0,0],[0,0],[0,0],[0,0]]
-
-# Define the codec and create VideoWriter object
-#video = cv2.VideoWriter('video_output.avi',-1,1,(480,640))
+file1=open("trace.txt",'w')
 cap = cv2.VideoCapture(args.videofile)
-#fourcc = cv2.cv.CV_FOURCC(*'XVID')
-fourcc = cv2.cv.CV_FOURCC('P','I','M','1')
-out = cv2.VideoWriter('output.avi',fourcc, 20.0, (640,480))
 
+leng = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+
+tt=1
 i = 0
+ii = 0
+fr_count = 0
 while cap.isOpened():
     ret, frame = cap.read()
     i += 1
+    ii+=1
+    print("ii=",ii)
+    print("Total frames = ",leng)
+    if ii >= (leng-1):
+        print("Video is over")
+        break
+    if ii < args.start:
+        continue
     if i < args.stride: # TODO: 2 B removed
         continue
+    else:
+        i=0
+
+    fr_count += 1
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     eye_pos = eye_selector.get_pos(gray)
-    print(i)
+    print("i=",i)
 
     if eye_pos is not None:
-        pupil_pos = pupil_selector.get_pos(eye_selector(gray)) # this is the patch selection with SVMs
-        if pupil_pos is not None:
+        #START HERE JUGNU... implementation 2
 
-            # ------------ START HERE.... fabian implementation
-            '''
-            pupil_pos = eye_pos+pupil_pos
-            cv2.rectangle(gray, tuple(pupil_pos[::-1]), tuple( pupil_pos[::-1]+pupil_selector.full_patch_size), (255,0,0), 3)
+        #cv2.rectangle(gray, tuple(eye_pos[::-1]), tuple( eye_pos[::-1]+eye_selector.full_patch_size), (255,0,0), 3)
+        small_gray = gray[eye_pos[0]:eye_pos[0]+eye_selector.full_patch_size,
+                            eye_pos[1]:eye_pos[1]+eye_selector.full_patch_size]
+        cv2.medianBlur(small_gray, 7, small_gray)
+        th=args.threshold
+        th=0.5*(np.percentile(small_gray.ravel(),99)) + 0.5 *(np.percentile(small_gray.ravel(),1))
+        #th=0.4*np.percentile(small_gray.ravel(), 50) -40
+        flag=0
+        while(1):
+            _, thres = cv2.threshold(small_gray, th, 255, cv2.THRESH_BINARY )
+            thres_copy = thres.copy()
+            contours1, hierarchy1 = cv2.findContours(thres,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+            #thres1=cv2.cvtColor(thres_copy, cv2.COLOR_GRAY2BGR)
+            maxc=None
+            maxr=0
+            for j in xrange(len(contours1)):
+                cnt1=contours1[j]
+                (x,y),radius1 = cv2.minEnclosingCircle(cnt1)
+                center1 = (int(x),int(y))
+                radius1 = int(radius1)
+                if ((maxr < radius1) and (center1[1] > 70) and (center1[1] < 230) and (center1[0] > 70) and (center1[0] < 230) and (radius1 >5) and (radius1 <180)):
+                    maxr=radius1;
+                    maxc=center1;
+                    maxj=j
+                #cv2.circle(thres1,center1,radius1,(0,255,0),thickness=5)
+            print("Radius= ",maxr)
+            break
 
-            small_gray = gray[pupil_pos[0]:pupil_pos[0]+pupil_selector.full_patch_size,
-                                pupil_pos[1]:pupil_pos[1]+pupil_selector.full_patch_size]
-
-            _, im_bw = cv2.threshold(small_gray, np.percentile(small_gray.ravel(), args.threshold), 255, cv2.THRESH_BINARY_INV )
-            cv2.medianBlur(im_bw, 7, im_bw)
-            im_bw = cv2.erode(im_bw,kernel,iterations = 1)
-            cv2.medianBlur(im_bw, 3, im_bw)
-
-            im_bw = cv2.dilate(im_bw,kernel,iterations = 1)
-            moments = cv2.moments(im_bw) # moment
-            try:
-                cog = np.array([moments['m10']/moments['m00'], moments['m01']/moments['m00']], dtype=int)
-            except:
-                continue
-            '''
-            # ------------ END HERE
-            '''
-            #START HERE JUGNU... implementation 1
-            pupil_pos = eye_pos+pupil_pos
-            cv2.rectangle(gray, tuple(pupil_pos[::-1]), tuple( pupil_pos[::-1]+pupil_selector.full_patch_size), (255,0,0), 3)
-            small_gray = gray[pupil_pos[0]:pupil_pos[0]+pupil_selector.full_patch_size,
-                                pupil_pos[1]:pupil_pos[1]+pupil_selector.full_patch_size]
-            cv2.medianBlur(small_gray, 7, small_gray)
-            im_bw = cv2.adaptiveThreshold(small_gray,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,11,2)
-            cv2.medianBlur(im_bw, 7, im_bw)
-            im_bw = cv2.erode(im_bw,kernel,iterations = 1)
-            cv2.medianBlur(im_bw, 3, im_bw)
-            im_bw = cv2.dilate(im_bw,kernel,iterations = 1)
-            im_bw_inv = 255-im_bw
-            moments = cv2.moments(im_bw_inv) # moment
-            try:
-                cog = np.array([moments['m10']/moments['m00'], moments['m01']/moments['m00']], dtype=int)
-            except:
-                continue
-
-            contours, hierarchy = cv2.findContours(im_bw_inv,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-            cnt=contours[0]
-            #cv2.drawContours(im_bw6,cnt,-1,(0,255,0),-1)
-            (x,y),radius = cv2.minEnclosingCircle(cnt)
-            center = (int(x),int(y))
-            radius = int(radius)
-            #END HERE JUGNU..implementation 1
-            '''
-            #START HERE JUGNU... implementation 2
-
-            pupil_pos = eye_pos+pupil_pos
-            cv2.rectangle(gray, tuple(pupil_pos[::-1]), tuple( pupil_pos[::-1]+pupil_selector.full_patch_size), (255,0,0), 3)
-            small_gray = gray[pupil_pos[0]:pupil_pos[0]+pupil_selector.full_patch_size,
-                                pupil_pos[1]:pupil_pos[1]+pupil_selector.full_patch_size]
-            cv2.medianBlur(small_gray, 7, small_gray)
-            th=args.threshold
-            #th=0.4*np.percentile(small_gray.ravel(), 50) -40
-            flag=0
-            while(1):
-                _, thres = cv2.threshold(small_gray, np.percentile(small_gray.ravel(), th), 255, cv2.THRESH_BINARY_INV )
-                thres_copy = thres.copy()
-                contours1, hierarchy1 = cv2.findContours(thres,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-                thres1=cv2.cvtColor(thres_copy, cv2.COLOR_GRAY2BGR)
-                maxr=0
-                for j in xrange(len(contours1)):
-                    cnt1=contours1[j]
-                    #cv2.drawContours(thres1,cnt1,-1,(0,255,0),-1)
-                    (x,y),radius1 = cv2.minEnclosingCircle(cnt1)
-                    center1 = (int(x),int(y))
-                    radius1 = int(radius1)
-                    if maxr < radius1:
-                        maxr=radius1;
-                        maxc=center1;
-                #print("Radius= ",maxr)
-                if (maxr>38 and flag==0):
-                    th= th-10
-                    #print("th=",th)
-                    flag=1
-                else:
-                    #print("Entered break")
-                    break
-
-            #END HERE JUGNU..implementation 2
-
-
-
-
-            #for k in range(4):
-            #    pipe_maxc[k]=pipe_maxc[k+1]
-            #    pipe_maxr[k]=pipe_maxr[k+1]
-            #pipe_maxc[4]=maxc
-            #pipe_maxr[4]=maxr
-            #piper_avg=np.average(pipe_maxr)
-            #pipec_avg0=pipe.
-            #print("Average maxr and maxc are", piper_avg, pipec_avg)
-            cv2.circle(gray, tuple(pupil_pos[::-1] + maxc), maxr, (255,0,0), thickness=2, lineType=8, shift=0)
         cv2.rectangle(gray, tuple(eye_pos[::-1]), tuple( eye_pos[::-1]+eye_selector.full_patch_size), (255,0,0), 3)
+        #cv2.circle(small_gray,maxc,maxr,(0,255,0),thickness=5)
+        if maxc is not None:
+            #ransac implementation starts
+            angles=[]
+            for pts in contours1[maxj]:
+                x=(pts[0][0]-maxc[0])
+                if x == 0:
+                    alpt=float(pts[0][1]-maxc[1])/0.001
+                else:
+                    alpt=float(pts[0][1]-maxc[1])/x
+                alp=math.atan(alpt)
+                angles.append(alp*180/3.14) 
+            centerx=[]
+            centery=[]
+            ang=np.asarray(angles)
+            for i in np.random.uniform(-80,80,30):
+                #print("Doing for angle=",i)
+                idx1=np.asarray(np.where(ang>(i-10)))
+                idx2=np.asarray(np.where(ang<(i+10)))
+                res=np.intersect1d(idx1,idx2)
+                samples=contours1[maxj][res]
+                print("size samples=",len(samples))
+                #from IPython import embed
+                #embed()
+                centerx.append(samples.mean(axis=0)[0][0])
+                centery.append(samples.mean(axis=0)[0][1])
+                if len(samples)>5:
+                    ellipse=cv2.fitEllipse(samples)
+                    
+                    #cv2.ellipse(small_gray,ellipse,(0,0,255),2)
+                    #centerx.append(ellipse[0][0])
+                    #centery.append(ellipse[0][1])
+            centerx=np.asarray(centerx)
+            centery=np.asarray(centery)
 
+            #ransac implementation ends 
+            cv2.drawContours(small_gray,contours1,maxj,(255,0,0),1)
+            ellipse = cv2.fitEllipse(contours1[maxj])
+            cv2.ellipse(small_gray,ellipse,(0,0,255),2)
+            stx=100.0*centerx.std()/min(ellipse[1][0],ellipse[1][1])
+            sty=float(100.0*centery.std()/(ellipse[1][0]+ellipse[1][1]))
+            file1.write("     X-Position=%s"%(int(ellipse[0][0]+eye_pos[1])))
+            file1.write("     Y-Position=%s"%(int(ellipse[0][1]+eye_pos[0])))
+            file1.write("     Radius1=%s"%(ellipse[1][0]))
+            file1.write("     Radius2=%s"%(ellipse[1][1]))
+            file1.write("     Angle_pupil=%s"%(ellipse[2]))
+            file1.write("     X_ROI=%s"%(eye_pos[1]))
+            file1.write("     Y_ROI=%s"%(eye_pos[0]))
+            file1.write("     STD_X=%s"%(centerx.std()))
+            file1.write("     STD_Y=%s"%(centery.std()))
+            file1.write("\n")
+        else:
+            print("No ellipse found")
+            file1.write("NONE \n")
 
-    cv2.imshow('frame', gray)
-    out.write(gray)
+    else:
+        file1.write("NONE \n")
+
+    #cv2.imshow('frame', gray)
+    re = fr_count%tt
+    f_count = fr_count//tt
+    if re == 0:
+    	name = "images/img%06d.bmp" % (f_count,)
+    	cv2.imwrite(name,gray)
+    #cv2.imshow('frame2', thres1)
+    #out.write(gray)
 
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-out.release()
 cap.release()
+file1.close()
 cv2.destroyAllWindows()
