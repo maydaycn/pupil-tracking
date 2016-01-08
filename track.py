@@ -1,6 +1,7 @@
 from __future__ import print_function
 import argparse
 import math
+import random
 import h5py
 import numpy as np
 import cv2
@@ -19,8 +20,8 @@ parser.add_argument('videofile', metavar='videofile', type=str,
                     help='Video of the mouse eye.')
 parser.add_argument('-t', '--threshold', type=int, default=20, help='threshold for binarizing pupil image (in percent)')
 parser.add_argument('-k', '--erosion-kernel-size', type=int, default=5, help='size of the erosion kernel')
-parser.add_argument('-s', '--stride', type=int, default=1, help='stride for rastering the image')
-parser.add_argument('-T', '--start', type=int, default=1, help='starting frame')
+parser.add_argument('-s', '--stride', type=int, default=0, help='stride for rastering the image')
+parser.add_argument('-T', '--start', type=int, default=0, help='starting frame')
 args = parser.parse_args()
 # ----------------------------------
 
@@ -32,29 +33,20 @@ cap = cv2.VideoCapture(args.videofile)
 leng = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
 
 tt=1
-i = 0
-ii = 0
 fr_count = 0
 while cap.isOpened():
     ret, frame = cap.read()
-    i += 1
-    ii+=1
-    print("ii=",ii)
-    print("Total frames = ",leng)
-    if ii >= (leng-1):
-        print("Video is over")
-        break
-    if ii < args.start:
-        continue
-    if i < args.stride: # TODO: 2 B removed
-        continue
-    else:
-        i=0
+    fr_count+=1
 
-    fr_count += 1
+    print("fr_count=",fr_count)
+    print("Total frames = ",leng)
+    if fr_count >= (leng):
+        print("Video: ",args.videofile," is over")
+        break
+
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     eye_pos = eye_selector.get_pos(gray)
-    print("i=",i)
+
 
     if eye_pos is not None:
         #START HERE JUGNU... implementation 2
@@ -84,13 +76,13 @@ while cap.isOpened():
                     maxc=center1;
                     maxj=j
                 #cv2.circle(thres1,center1,radius1,(0,255,0),thickness=5)
-            print("Radius= ",maxr)
+            #print("Radius= ",maxr)
             break
 
         cv2.rectangle(gray, tuple(eye_pos[::-1]), tuple( eye_pos[::-1]+eye_selector.full_patch_size), (255,0,0), 3)
         #cv2.circle(small_gray,maxc,maxr,(0,255,0),thickness=5)
         if maxc is not None:
-            #ransac implementation starts
+            #RANSAC1 implementation starts
             angles=[]
             for pts in contours1[maxj]:
                 x=(pts[0][0]-maxc[0])
@@ -109,21 +101,63 @@ while cap.isOpened():
                 idx2=np.asarray(np.where(ang<(i+10)))
                 res=np.intersect1d(idx1,idx2)
                 samples=contours1[maxj][res]
-                print("size samples=",len(samples))
+                #print("size samples=",len(samples))
                 #from IPython import embed
                 #embed()
                 centerx.append(samples.mean(axis=0)[0][0])
                 centery.append(samples.mean(axis=0)[0][1])
-                if len(samples)>5:
-                    ellipse=cv2.fitEllipse(samples)
+                #if len(samples)>5:
+                    #ellipse=cv2.fitEllipse(samples)
                     
                     #cv2.ellipse(small_gray,ellipse,(0,0,255),2)
                     #centerx.append(ellipse[0][0])
                     #centery.append(ellipse[0][1])
             centerx=np.asarray(centerx)
             centery=np.asarray(centery)
+            #RANSAC1 implementation ends
 
-            #ransac implementation ends 
+
+            #from IPython import embed
+            #embed()
+            #RANSAC2 implementation starts
+            r2centerx=[]
+            r2centery=[]
+            r2majrad=[]
+            r2minrad=[]
+            r2angle=[]
+            for i in range(100):
+                if len(contours1[maxj])>60:
+                    samples=np.asarray(random.sample(contours1[maxj],len(contours1[maxj])/10))
+                    ellipse=cv2.fitEllipse(samples)
+                    cv2.ellipse(small_gray,ellipse,(0,0,255),2)
+                    r2centerx.append(ellipse[0][0])
+                    r2centery.append(ellipse[0][1])
+                    r2majrad.append(ellipse[1][1])
+                    r2minrad.append(ellipse[1][0])
+                    r2angle.append(ellipse[2])
+                else:
+                    r2centerx.append(0)
+                    r2centery.append(0)
+                    r2majrad.append(0)
+                    r2minrad.append(0)
+                    r2angle.append(0)
+            r2centerx=np.asarray(r2centerx)
+            r2centery=np.asarray(r2centery)
+            r2majrad=np.asarray(r2majrad)
+            r2minrad=np.asarray(r2minrad)
+            r2angle=np.asarray(r2angle)
+
+            #from IPython import embed
+            #embed()
+
+
+
+
+
+
+
+            #RANSAC2 implementation ends
+
             cv2.drawContours(small_gray,contours1,maxj,(255,0,0),1)
             ellipse = cv2.fitEllipse(contours1[maxj])
             cv2.ellipse(small_gray,ellipse,(0,0,255),2)
@@ -138,6 +172,11 @@ while cap.isOpened():
             file1.write("     Y_ROI=%s"%(eye_pos[0]))
             file1.write("     STD_X=%s"%(centerx.std()))
             file1.write("     STD_Y=%s"%(centery.std()))
+            file1.write("     R2STD_X=%s"%(r2centerx.std()))
+            file1.write("     R2STD_Y=%s"%(r2centery.std()))
+            file1.write("     R2STD_rad_min=%s"%(r2minrad.std()))
+            file1.write("     R2STD_rad_maj=%s"%(r2majrad.std()))
+            file1.write("     R2STD_angle=%s"%(r2angle.std()))
             file1.write("\n")
         else:
             print("No ellipse found")
@@ -150,8 +189,9 @@ while cap.isOpened():
     re = fr_count%tt
     f_count = fr_count//tt
     if re == 0:
-    	name = "images/img%06d.bmp" % (f_count,)
-    	cv2.imwrite(name,gray)
+        name = "images/img%06d.bmp" % (f_count,)
+        print("Writing file for ", f_count)
+        cv2.imwrite(name,gray)
     #cv2.imshow('frame2', thres1)
     #out.write(gray)
 
