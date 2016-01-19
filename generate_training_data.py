@@ -16,8 +16,8 @@ parser.add_argument('videofile', metavar='videofile', type=str,
                     help='Videofile with showing the eye. ')
 parser.add_argument('outfile', metavar='outfile', type=str,
                     help='Output file for the training dataset.')
-parser.add_argument('-q', '--downsample-factor', type=int, default=10, help='downsample factor (default 10)')
-parser.add_argument('-P', '--patch-size', type=int, default=30, help='patch size (default 30)')
+parser.add_argument('-q', '--downsample-factor', type=int, default=30, help='downsample factor (default 30)')
+parser.add_argument('-P', '--patch-size', type=int, default=10, help='patch size (default 10)')
 
 parser.add_argument('-p', '--positives', type=int, default=200,
                     help='numper of positive examples to collect (default 200)')
