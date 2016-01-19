@@ -22,6 +22,7 @@ parser.add_argument('-t', '--threshold', type=int, default=20, help='threshold f
 parser.add_argument('-k', '--erosion-kernel-size', type=int, default=5, help='size of the erosion kernel')
 parser.add_argument('-s', '--stride', type=int, default=0, help='stride for rastering the image')
 parser.add_argument('-T', '--start', type=int, default=0, help='starting frame')
+parser.add_argument('-R', '--ransac_trials', type=int, default=100, help='Number of times to pick points and calculate standard deviation')
 args = parser.parse_args()
 # ----------------------------------
 
@@ -47,13 +48,14 @@ while cap.isOpened():
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     eye_pos = eye_selector.get_pos(gray)
 
-
+    full_patch_size=eye_selector.full_patch_size
     if eye_pos is not None:
         #START HERE JUGNU... implementation 2
 
         #cv2.rectangle(gray, tuple(eye_pos[::-1]), tuple( eye_pos[::-1]+eye_selector.full_patch_size), (255,0,0), 3)
         small_gray = gray[eye_pos[0]:eye_pos[0]+eye_selector.full_patch_size,
                             eye_pos[1]:eye_pos[1]+eye_selector.full_patch_size]
+        #print("ps=",eye_selector.full_patch_size)
         cv2.medianBlur(small_gray, 7, small_gray)
         th=args.threshold
         th=0.5*(np.percentile(small_gray.ravel(),99)) + 0.5 *(np.percentile(small_gray.ravel(),1))
@@ -71,14 +73,18 @@ while cap.isOpened():
                 (x,y),radius1 = cv2.minEnclosingCircle(cnt1)
                 center1 = (int(x),int(y))
                 radius1 = int(radius1)
-                if ((maxr < radius1) and (center1[1] > 70) and (center1[1] < 230) and (center1[0] > 70) and (center1[0] < 230) and (radius1 >5) and (radius1 <180)):
-                    maxr=radius1;
-                    maxc=center1;
+                #if ((maxr < radius1) and (center1[1] > 70) and (center1[1] < 230) and (center1[0] > 70) and (center1[0] < 230) and (radius1 >5) and (radius1 <180)):
+                if ((maxr < radius1) and (center1[1] > 0.25*full_patch_size) and (center1[1] < 0.75*full_patch_size) and (center1[0] > 0.25*full_patch_size) and (center1[0] < 0.75*full_patch_size) and (radius1 >5) and (radius1 <180) and len(contours1[j]) >= 5):
+                    maxr=radius1
+                    maxc=center1
                     maxj=j
                 #cv2.circle(thres1,center1,radius1,(0,255,0),thickness=5)
             #print("Radius= ",maxr)
             break
 
+        #print("eyepos=",eye_pos[::-1])
+        #print("eyepos=",eye_pos)
+        #print("tu=",tuple( eye_pos[::-1]+eye_selector.full_patch_size))
         cv2.rectangle(gray, tuple(eye_pos[::-1]), tuple( eye_pos[::-1]+eye_selector.full_patch_size), (255,0,0), 3)
         #cv2.circle(small_gray,maxc,maxr,(0,255,0),thickness=5)
         if maxc is not None:
@@ -108,7 +114,6 @@ while cap.isOpened():
                 centery.append(samples.mean(axis=0)[0][1])
                 #if len(samples)>5:
                     #ellipse=cv2.fitEllipse(samples)
-                    
                     #cv2.ellipse(small_gray,ellipse,(0,0,255),2)
                     #centerx.append(ellipse[0][0])
                     #centery.append(ellipse[0][1])
@@ -116,16 +121,13 @@ while cap.isOpened():
             centery=np.asarray(centery)
             #RANSAC1 implementation ends
 
-
-            #from IPython import embed
-            #embed()
             #RANSAC2 implementation starts
             r2centerx=[]
             r2centery=[]
             r2majrad=[]
             r2minrad=[]
             r2angle=[]
-            for i in range(100):
+            for i in range(args.ransac_trials):
                 if len(contours1[maxj])>60:
                     samples=np.asarray(random.sample(contours1[maxj],len(contours1[maxj])/10))
                     ellipse=cv2.fitEllipse(samples)
@@ -136,27 +138,37 @@ while cap.isOpened():
                     r2minrad.append(ellipse[1][0])
                     r2angle.append(ellipse[2])
                 else:
-                    r2centerx.append(0)
-                    r2centery.append(0)
-                    r2majrad.append(0)
-                    r2minrad.append(0)
-                    r2angle.append(0)
+                    r2centerx.append(100*(i%2))
+                    r2centery.append(100*(i%2))
+                    r2majrad.append(100*(i%2))
+                    r2minrad.append(100*(i%2))
+                    r2angle.append(100*(i%2))
             r2centerx=np.asarray(r2centerx)
             r2centery=np.asarray(r2centery)
             r2majrad=np.asarray(r2majrad)
             r2minrad=np.asarray(r2minrad)
             r2angle=np.asarray(r2angle)
-
-            #from IPython import embed
-            #embed()
-
-
-
-
-
-
-
             #RANSAC2 implementation ends
+
+            #RANSAC 3
+            '''
+            ellipse = cv2.fitEllipse(contours1[maxj])
+            centx=ellipse[0][0]
+            centy=ellipse[0][1]
+            angle=ellipse[2]
+            i=0
+            g_GOF=0
+            for coord in contours1[maxj]:
+                posx = (coord[0][0] - centx) * math.cos(-angle) - (coord[0][1]- centy) * math.sin(-angle)
+                posy = (coord[0][0] - centx) * math.sin(-angle) + (coord[0][1]- centy) * math.cos(-angle)
+                #embed()
+                temp = abs(pow(pow(posx/ellipse[1][0],2) + pow(posy/ellipse[1][1],2) - 0.25,2))
+                g_GOF += temp
+                print("Error of point=",temp)
+            g_GOF=g_GOF/len(contours[maxj])
+            '''
+            #RANSAC3 ends
+
 
             cv2.drawContours(small_gray,contours1,maxj,(255,0,0),1)
             ellipse = cv2.fitEllipse(contours1[maxj])
@@ -177,6 +189,7 @@ while cap.isOpened():
             file1.write("     R2STD_rad_min=%s"%(r2minrad.std()))
             file1.write("     R2STD_rad_maj=%s"%(r2majrad.std()))
             file1.write("     R2STD_angle=%s"%(r2angle.std()))
+            #file1.write("     g_GOF=%s"%(g_GOF))
             file1.write("\n")
         else:
             print("No ellipse found")
