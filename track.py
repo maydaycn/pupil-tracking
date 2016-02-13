@@ -33,7 +33,8 @@ cap = cv2.VideoCapture(args.videofile)
 
 leng = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
 
-tt=1
+#use tt variable to mention after  how many images do you want to save an image, ideally 30
+tt=30
 fr_count = 0
 while cap.isOpened():
     ret, frame = cap.read()
