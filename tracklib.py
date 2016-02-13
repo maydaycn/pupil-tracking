@@ -3,8 +3,10 @@ import warnings
 import cv2
 import h5py
 import numpy as np
+import scipy
+from sklearn import preprocessing
 from sklearn.externals import joblib
-
+import random
 
 class PatchSelector:
     def __init__(self, svmfile, datafile, thin=1):
@@ -40,13 +42,40 @@ class PatchSelector:
         return self.patch_size * self.q
 
 
-def extract_patches(img, patch_size, normalize=True, thin=1):
+def center_patches(X):
+    return X - X.mean(axis=1)[:, np.newaxis]
+
+
+def thresholding(X):
+    for i, X_temp in enumerate(X):
+        th=0.5*(np.percentile(X_temp,99)) + 0.5 *(np.percentile(X_temp,1))
+        X_temp = scipy.stats.threshold(X_temp,threshmax=th-0.1, newval=1 )
+        X_temp = scipy.stats.threshold(X_temp,threshmin=th, newval=0 )
+        X[i]=X_temp
+        #print(i)
+    return X
+
+def center_scale (X):
+    Y = X - X.mean(axis=1)[:, np.newaxis]
+    return preprocessing.scale(Y)
+
+
+
+def extract_patches(img, patch_size, normalize=True, thin=1, preprocess=True):
     X = []
     pos = list(itertools.product(range(img.shape[0] - patch_size), range(img.shape[1] - patch_size))) #jugnu img.shape[1] for y cordinate??
     for i, j in pos:
-        X.append(img[i:i + patch_size, j:j + patch_size].ravel()) #jugnu ravel is for turning matrix in a vector
+        X.append(img[i:i + patch_size, j:j + patch_size].ravel())
+    #return np.vstack(X) / (255. if normalize else 1.), np.vstack(pos)
+    if preprocess:
+        X_st = np.vstack(X) / (255. if normalize else 1.)
+        #preprocessing the data before prediction by SVM
+        X_pp = center_patches(X_st)
+        #X_pp = center_scale(X_st)
+        return np.vstack(X_pp), np.vstack(pos)
+    else:
+        return np.vstack(X) / (255. if normalize else 1.), np.vstack(pos)
 
-    return np.vstack(X) / (255. if normalize else 1.), np.vstack(pos) #jugnu vstack turns a row into a column
 
 
 def frst(img, radii, alpha=2., std_factor=0.25, k_n=9.9, orientation_based=False, beta=2):
@@ -114,3 +143,36 @@ def extract_patch(x, img, patch_size):
         return None
     else:
         return img[y_sl, x_sl].ravel()
+
+
+def ransac(ntrials, contour, small_gray, draw):
+    # RANSAC2 implementation starts
+    r2centerx = []
+    r2centery = []
+    r2majrad = []
+    r2minrad = []
+    r2angle = []
+    for i in range(ntrials):
+        if len(contour) > 60:
+            samples = np.asarray(random.sample(contour, len(contour)/10))
+            ellipse=cv2.fitEllipse(samples)
+            if draw:
+                cv2.ellipse(small_gray, ellipse, (0, 0, 255), 2)
+            r2centerx.append(ellipse[0][0])
+            r2centery.append(ellipse[0][1])
+            r2majrad.append(ellipse[1][1])
+            r2minrad.append(ellipse[1][0])
+            r2angle.append(ellipse[2])
+        else:
+            r2centerx.append(100*(i%2))
+            r2centery.append(100*(i%2))
+            r2majrad.append(100*(i%2))
+            r2minrad.append(100*(i%2))
+            r2angle.append(100*(i%2))
+    r2centerx = np.asarray(r2centerx)
+    r2centery = np.asarray(r2centery)
+    r2majrad = np.asarray(r2majrad)
+    r2minrad = np.asarray(r2minrad)
+    r2angle = np.asarray(r2angle)
+    return (r2centerx, r2centery, r2majrad, r2minrad, r2angle, small_gray)
+    # RANSAC2 implementation ends
