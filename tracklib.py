@@ -1,11 +1,11 @@
 import itertools
 import warnings
 import cv2
-import h5py
+#import h5py
 import numpy as np
 import scipy
-from sklearn import preprocessing
-from sklearn.externals import joblib
+#from sklearn import preprocessing
+#from sklearn.externals import joblib
 import random
 
 class PatchSelector:

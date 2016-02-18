@@ -2,11 +2,11 @@ from __future__ import print_function
 import argparse
 import math
 import random
-import h5py
+# import h5py
 import numpy as np
 import cv2
 import pandas as pd
-from sklearn.externals import joblib
+# from sklearn.externals import joblib
 
 from tracklib import extract_patches, PatchSelector, ransac
 
@@ -37,7 +37,7 @@ trace = pd.DataFrame(
     columns=['pupil_x', 'pupil_y', 'pupil_r_minor', 'pupil_r_major', 'pupil_angle', 'pupil_x_std', 'pupil_y_std',
              'pupil_r_minor_std', 'pupil_r_major_std', 'pupil_angle_std', 'intensity_std'])
 #trace2 = pd.DataFrame(columns=['intensity_std'])
-leng = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+leng = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 # use tt to indicate after how many image do you want to locally save the image
 tt = 10
@@ -72,7 +72,7 @@ while cap.isOpened():
         while (1):
             _, thres = cv2.threshold(small_gray, th, 255, cv2.THRESH_BINARY)
             thres_copy = thres.copy()
-            contours1, hierarchy1 = cv2.findContours(thres, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            _, contours1, hierarchy1 = cv2.findContours(thres, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
             maxc = None
             maxr = 0
