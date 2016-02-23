@@ -71,7 +71,7 @@ class PupilTracker:
         while cap.isOpened():
             ret, frame = cap.read()
             fr_count += 1
-            if fr_count % 1 == 500:
+            if fr_count % 500 == 0:
                 print("fr_count=", fr_count)
                 print("Total frames = ", leng)
             if fr_count >= (leng):
