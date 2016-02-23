@@ -22,9 +22,6 @@ args = parser.parse_args()
 
 
 class PupilTracker:
-    def __init__(self):
-        self.x = None
-
     def ransac(self, ntrials, contour, small_gray, draw):
         # RANSAC2 implementation starts
         r2centerx = []
