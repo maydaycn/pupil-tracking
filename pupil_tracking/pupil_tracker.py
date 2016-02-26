@@ -1,13 +1,11 @@
-import argparse
 import numpy as np
 import cv2
 import pandas as pd
-from IPython import embed
 
 
 class PupilTracker:
     def ransac(self, ntrials, contour, small_gray, draw):
-        # RANSAC2 implementation starts
+        # RANSAC implementation starts
         r2centerx = []
         r2centery = []
         r2majrad = []
@@ -37,7 +35,7 @@ class PupilTracker:
         r2minrad = np.asarray(r2minrad)
         r2angle = np.asarray(r2angle)
         return r2centerx, r2centery, r2majrad, r2minrad, r2angle, small_gray
-        # RANSAC2 implementation ends
+        # RANSAC implementation ends
 
     def track_without_svm(self, videofile, eye_roi, ransac_trials = 100):
 
@@ -65,26 +63,14 @@ class PupilTracker:
                 break
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # eye_pos is the eye centre which is converted to patch starting pixel index below
-            # full_patch_size = full_patch_size
-            #eye_pos = [y_roi - full_patch_size / 2, x_roi - full_patch_size / 2]
             eye_pos = [eye_roi[1], eye_roi[0]]
             full_patch_size = max(eye_roi[2]-eye_roi[0], eye_roi[3]-eye_roi[1])
-            # print("Eye_pos =", eye_pos, "full_patch_size=", full_patch_size)
-
-
-            #small_gray = gray[eye_pos[0]:eye_pos[0] + full_patch_size,
-            #             eye_pos[1]:eye_pos[1] + full_patch_size]
-
             small_gray = gray[eye_roi[1]:eye_roi[3], eye_roi[0]:eye_roi[2]]
             cv2.medianBlur(small_gray, 7, small_gray)
             variation = np.std(small_gray)
             th = 0.5 * (np.percentile(small_gray.ravel(), 99)) + 0.5 * (np.percentile(small_gray.ravel(), 1))
-            # flag = 0
-
             _, thres = cv2.threshold(small_gray, th, 255, cv2.THRESH_BINARY)
             _, contours1, hierarchy1 = cv2.findContours(thres, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
             maxc = None
             maxr = 0
             draw = 0
@@ -102,6 +88,7 @@ class PupilTracker:
                         center1[1] - full_patch_size / 2)
                     maxc = center1
                     maxj = j
+
             if draw:
                 cv2.rectangle(gray, tuple([int(float(x)) for x in eye_pos[::-1]]),
                               tuple([int(float(x)) + full_patch_size for x in eye_pos[::-1]]), (255, 0, 0), 3)
