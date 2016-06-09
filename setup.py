@@ -17,7 +17,7 @@ setup(
     url='https://github.com/cajal/pupil-tracking',
     keywords='eyetracker',
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
-    install_requires=['numpy', 'cv2'],
+    install_requires=['numpy'],
     classifiers=[
         'Development Status :: 1 - Beta',
         'Intended Audience :: Science/Research',
